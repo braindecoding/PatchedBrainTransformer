@@ -1,0 +1,20 @@
+Code from the paper "Patched Brain Transformer: Flexible Model for EEG Decoding"
+
+Usage:
+For unsupervised pre-training run preTraining.py with config['pre_train_bert'] =  True.
+For supervised pre-training run preTraining.py with config['pre_train_bert'] =  False.
+
+For fine tune the model run fineTune.py.
+
+Detailed usage instructions are in the comments in the code.
+
+Dependencies:
+python = 3.9
+torch 2.0.1
+numpy = 1.26.0
+MOABB = 0.4.6
+
+
+
+
+
