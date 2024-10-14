@@ -1,4 +1,4 @@
-Code from the paper "Patched Brain Transformer: Flexible Model for EEG Decoding"
+Code from the paper "Patched Brain Transformer: Flexible AI-Model for EEG Decoding"
 
 Usage:
 For unsupervised pre-training run preTraining.py with config['pre_train_bert'] =  True.
