@@ -5,7 +5,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
-from model import LearningRateScheduler
+from src.model import LearningRateScheduler
 
 
 def training(
