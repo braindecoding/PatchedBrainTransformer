@@ -82,7 +82,7 @@ def pre_train(config, reduce_num_chs_to):
         model=model,
         train_data_set=train_data_set,
         test_data_set=test_data_set,
-        n_classes=6,
+        n_classes=10,  # MNIST has 10 classes (digits 0-9)
         num_workers=4,
     )
 
@@ -99,7 +99,7 @@ if __name__ == "__main__":
         "d_input": 32,
         "d_model": 64,  # Input gets expanded in lin. projection
         "dim_feedforward": 64 * 4,
-        "num_tokens_per_channel": 8,  # 4 harusny For 256 samples EPOC (4*64=256)
+        "num_tokens_per_channel": 7,  # For 256 samples EPOC (7*32=224 < 256)
         "num_transformer_blocks": 4,
         "num_heads": 8,  # number attention heads transformer
         "bert_supervised": False,  # add a reconstruction task (BERT) as regularisation to loss
