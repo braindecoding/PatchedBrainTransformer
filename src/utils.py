@@ -24,175 +24,246 @@ def get_mindbigdata_eeg(
     file_path="datasets/EP1.01.txt", freq_min=8, freq_max=45, resample=250, channels=None, n_classes=None
 ):
     """
-    Load MindBigData EEG dataset from local file
+    Load MindBigData EEG dataset from local file - MNIST Visual Stimulus
+    EP1.01.txt contains EEG data recorded while subjects viewed MNIST digits (0-9)
     """
     import pandas as pd
     import os
 
     if channels is None:
+        # MindBigData EPOC uses 14 channels: AF3, F7, F3, FC5, T7, P7, O1, O2, P8, T8, FC6, F4, F8, AF4
         channels = [
-            "Fpz", "F7", "F3", "Fz", "F4", "F8", "T7", "C3", "Cz", "C4",
-            "T8", "P7", "P3", "Pz", "P4", "P8"
+            "AF3", "F7", "F3", "FC5", "T7", "P7", "O1", "O2", "P8", "T8", "FC6", "F4", "F8", "AF4"
         ]
 
     if n_classes is None:
-        n_classes = 3
+        n_classes = 10  # MNIST digits 0-9
 
     try:
         # Check if file exists
         if not os.path.exists(file_path):
             print(f"MindBigData file not found: {file_path}")
-            print("Falling back to synthetic data...")
-            return get_synthetic_eeg_data(None, freq_min, freq_max, resample, channels, n_classes)
+            print("Falling back to MNIST data...")
+            return None
 
-        print(f"Loading MindBigData from: {file_path}")
+        print(f"Loading MindBigData MNIST from: {file_path}")
 
-        # For now, just generate synthetic data but with MindBigData structure
-        # This can be enhanced later to actually parse the MindBigData format
+        # Read the actual MindBigData file
         all_data_trials = []
         all_labels = []
         all_meta = []
 
         n_channels = len(channels)
-        n_samples = int(4 * resample)  # 4 seconds of data
 
-        # Generate some trials (simplified for now)
-        for i in range(300):  # Create 300 trials
-            # Create a trial with synthetic EEG-like data
-            trial_data = np.random.randn(n_channels, n_samples) * 0.1
+        # Read file line by line
+        with open(file_path, 'r') as f:
+            lines = f.readlines()
 
-            # Add some structure to make it more EEG-like
-            for ch in range(n_channels):
-                t = np.linspace(0, 4, n_samples)
-                alpha_freq = np.random.uniform(8, 12)
-                beta_freq = np.random.uniform(13, 30)
+        print(f"Found {len(lines)} lines in MindBigData file")
 
-                trial_data[ch] += (
-                    np.sin(2 * np.pi * alpha_freq * t) * np.random.uniform(0.5, 1.5) +
-                    np.sin(2 * np.pi * beta_freq * t) * np.random.uniform(0.3, 0.8)
-                )
+        # Parse MindBigData EPOC format
+        # Format: [id] [event] [device] [channel] [code] [size] [data]
+        # Fields separated by TAB, data separated by comma
+        # Example: 67650	67636	EP	F7	7	260	4482.564102,4477.435897,4484.102564...
+        trials_processed = 0
+        max_trials = 1000  # Limit for memory efficiency
+
+        # Group data by event_id to reconstruct multi-channel trials
+        events_data = {}
+
+        for line_idx, line in enumerate(lines):
+            if trials_processed >= max_trials:
+                break
+
+            line = line.strip()
+            if not line or line.startswith('#'):  # Skip empty lines and comments
+                continue
+
+            try:
+                # Split the line by TAB (not comma!)
+                parts = line.split('\t')
+                if len(parts) < 6:  # Need at least id, event, device, channel, code, size
+                    continue
+
+                # Parse MindBigData EPOC format: [id] [event] [device] [channel] [code] [size] [data]
+                record_id = parts[0].strip()
+                event_id = parts[1].strip()
+                device = parts[2].strip()
+                channel = parts[3].strip()
+
+                # Only process EPOC data
+                if device != "EP":
+                    continue
+
+                # Extract digit label (code)
+                try:
+                    digit_label = int(float(parts[4]))
+                    if not (0 <= digit_label <= 9):
+                        continue  # Skip if not valid MNIST digit (skip -1 random signals)
+                except:
+                    continue  # Skip if can't parse digit
+
+                # Extract size (actual number of samples in this signal)
+                try:
+                    signal_size = int(float(parts[5]))
+                    if signal_size < 100:  # Skip if too few samples
+                        continue
+                except:
+                    continue  # Skip if can't parse size
+
+                # Extract EEG data (from column 6, comma-separated)
+                if len(parts) >= 7:
+                    data_str = parts[6].strip()
+                    eeg_data_raw = []
+                    for value_str in data_str.split(','):
+                        try:
+                            eeg_data_raw.append(float(value_str.strip()))
+                        except:
+                            continue
+                else:
+                    continue  # Skip if no data
+
+                # Verify we have enough data points
+                if len(eeg_data_raw) < 100:  # Need minimum samples
+                    continue
+
+                # Store data grouped by event
+                if event_id not in events_data:
+                    events_data[event_id] = {
+                        'digit': digit_label,
+                        'channels': {},
+                        'signal_size': signal_size
+                    }
+
+                # Store channel data
+                events_data[event_id]['channels'][channel] = np.array(eeg_data_raw)
+
+            except Exception as e:
+                continue  # Skip problematic lines
+
+        # Convert events to trials
+        print(f"Found {len(events_data)} events, processing into trials...")
+
+        # Debug: Check signal sizes and channels per event
+        signal_sizes = []
+        channels_per_event = []
+        for event_data in events_data.values():
+            if 'signal_size' in event_data:
+                signal_sizes.append(event_data['signal_size'])
+            channels_per_event.append(len(event_data['channels']))
+
+        if signal_sizes:
+            print(f"Signal size stats: min={min(signal_sizes)}, max={max(signal_sizes)}, avg={sum(signal_sizes)/len(signal_sizes):.1f}")
+        if channels_per_event:
+            print(f"Channels per event: min={min(channels_per_event)}, max={max(channels_per_event)}, avg={sum(channels_per_event)/len(channels_per_event):.1f}")
+            print(f"Events with 14 channels: {sum(1 for x in channels_per_event if x == 14)}/{len(channels_per_event)}")
+
+        for event_id, event_data in events_data.items():
+            if trials_processed >= max_trials:
+                break
+
+            # Check if we have enough channels for this event
+            available_channels = list(event_data['channels'].keys())
+            if len(available_channels) < 10:  # Need at least 10 channels for good quality
+                continue
+
+            # Map available channels to our expected EPOC layout
+            trial_data_list = []
+            used_channels = []
+
+            for expected_ch in channels:
+                if expected_ch in available_channels:
+                    trial_data_list.append(event_data['channels'][expected_ch])
+                    used_channels.append(expected_ch)
+                elif len(available_channels) > 0:
+                    # Use any remaining channel as fallback
+                    fallback_ch = available_channels[0]
+                    trial_data_list.append(event_data['channels'][fallback_ch])
+                    used_channels.append(fallback_ch)
+                    available_channels.remove(fallback_ch)
+                else:
+                    # Not enough channels, skip this event
+                    break
+
+            if len(trial_data_list) < n_channels:
+                continue  # Skip if not enough channels
+
+            # Ensure all channels have same length
+            channel_lengths = [len(data) for data in trial_data_list]
+            min_length = min(channel_lengths)
+            max_length = max(channel_lengths)
+
+            if min_length < 100:  # Need minimum samples
+                continue
+
+            # Use consistent length for all trials
+            # EPOC captures ~256 samples for 2 seconds (128Hz actual rate)
+            # But actual samples can vary, so we standardize to 256
+            target_samples = 256  # Standard EPOC length
+            n_samples_to_use = min(min_length, target_samples)
+
+            # Create trial data matrix with fixed size
+            trial_data = np.zeros((n_channels, target_samples))
+
+            for ch_idx in range(n_channels):
+                if ch_idx < len(trial_data_list):
+                    channel_data = trial_data_list[ch_idx][:n_samples_to_use]
+
+                    # Always resample to target length for consistency
+                    if len(channel_data) != target_samples:
+                        trial_data[ch_idx] = np.interp(
+                            np.linspace(0, 1, target_samples),
+                            np.linspace(0, 1, len(channel_data)),
+                            channel_data
+                        )
+                    else:
+                        trial_data[ch_idx] = channel_data
+
+            # EPOC data is already in microvolts, no need to scale
+            # Just normalize to reasonable range
+            trial_data = trial_data / 1000.0  # Convert to millivolts for better numerical stability
 
             all_data_trials.append(trial_data)
-
-            # Assign labels cyclically
-            label_idx = i % n_classes
-            if label_idx == 0:
-                all_labels.append('right_hand')
-            elif label_idx == 1:
-                all_labels.append('feet')
-            else:
-                all_labels.append('rest')
+            all_labels.append(event_data['digit'])
 
             # Create meta info
             meta_info = {
                 'subject': 1,
                 'session': 'session_1',
-                'run': 1
+                'run': 1,
+                'event_id': event_id,
+                'digit': event_data['digit'],
+                'channels_used': used_channels[:n_channels]
             }
             all_meta.append(meta_info)
 
-        # Convert to numpy array format expected by the pipeline
+            trials_processed += 1
+
+            if trials_processed % 100 == 0:
+                print(f"Processed {trials_processed} trials...")
+
+        print(f"Successfully processed {trials_processed} complete trials from {len(events_data)} events")
+
+        if len(all_data_trials) == 0:
+            print("No valid trials found in MindBigData file, using synthetic data...")
+            return None
+
+        # Convert to numpy arrays
         data_array = np.array(all_data_trials)
-        all_labels = np.array(all_labels)
-
-        # Convert string labels to integers like the original datasets
-        all_labels[np.where(all_labels == "right_hand")] = 1
-        all_labels[np.where(all_labels == "feet")] = 2
-        all_labels[np.where(all_labels == "rest")] = 4
-        all_labels = all_labels.astype(int)
-
+        all_labels = np.array(all_labels, dtype=int)
         meta_df = pd.DataFrame(all_meta)
 
-        print(f"Generated {len(all_data_trials)} trials with shape {data_array.shape}")
+        print(f"Successfully loaded {len(all_data_trials)} MNIST trials with shape {data_array.shape}")
+        print(f"MNIST digit distribution: {np.bincount(all_labels)}")
+
         return data_array, all_labels, meta_df, channels
 
     except Exception as e:
-        print(f"Error in MindBigData loader: {e}")
-        print("Falling back to synthetic data...")
-        return get_synthetic_eeg_data(None, freq_min, freq_max, resample, channels, n_classes)
+        print(f"Error loading MindBigData file: {e}")
+        print("Falling back to synthetic MNIST data...")
+        return None
 
 
-def get_synthetic_eeg_data(
-    subject=None, freq_min=8, freq_max=45, resample=250, channels=None, n_classes=None
-):
-    """
-    Generate synthetic EEG data for testing purposes
-    """
-    import pandas as pd
-
-    if channels is None:
-        channels = [
-            "Fpz", "F7", "F3", "Fz", "F4", "F8", "T7", "C3", "Cz", "C4",
-            "T8", "P7", "P3", "Pz", "P4", "P8"
-        ]
-
-    if n_classes is None:
-        n_classes = 3
-
-    if subject is None:
-        subject = list(range(1, 9))
-
-    # Create synthetic data
-    n_channels = len(channels)
-    n_trials_per_class = 20  # Reduced for faster testing
-    n_samples = int(4 * resample)  # 4 seconds of data
-
-    # Generate random EEG-like data
-    np.random.seed(42)
-    all_data_trials = []
-    all_labels = []
-    all_meta = []
-
-    for subj_idx, subj in enumerate(subject if isinstance(subject, list) else [subject]):
-        # Generate data for each class
-        for class_idx in range(n_classes):
-            for trial in range(n_trials_per_class):
-                # Generate synthetic EEG signal with some frequency content
-                t = np.linspace(0, 4, n_samples)
-                signal = np.zeros((n_channels, n_samples))
-
-                for ch in range(n_channels):
-                    # Add some alpha (8-12 Hz) and beta (13-30 Hz) components
-                    alpha_freq = np.random.uniform(8, 12)
-                    beta_freq = np.random.uniform(13, 30)
-
-                    signal[ch] = (
-                        np.sin(2 * np.pi * alpha_freq * t) * np.random.uniform(0.5, 1.5) +
-                        np.sin(2 * np.pi * beta_freq * t) * np.random.uniform(0.3, 0.8) +
-                        np.random.normal(0, 0.1, n_samples)  # noise
-                    )
-
-                all_data_trials.append(signal)
-
-                # Create labels
-                if class_idx == 0:
-                    all_labels.append('right_hand')
-                elif class_idx == 1:
-                    all_labels.append('feet')
-                else:
-                    all_labels.append('rest')
-
-                # Create meta info
-                meta_info = {
-                    'subject': subj,
-                    'session': 'session_1',
-                    'run': 1
-                }
-                all_meta.append(meta_info)
-
-    # Convert to numpy array format expected by the pipeline
-    data_array = np.array(all_data_trials)
-    all_labels = np.array(all_labels)
-
-    # Convert string labels to integers like the original datasets
-    all_labels[np.where(all_labels == "right_hand")] = 1
-    all_labels[np.where(all_labels == "feet")] = 2
-    all_labels[np.where(all_labels == "rest")] = 4
-    all_labels = all_labels.astype(int)
-
-    meta_df = pd.DataFrame(all_meta)
-
-    return data_array, all_labels, meta_df, channels
 
 
 def get_AlexMI(
