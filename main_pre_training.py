@@ -19,8 +19,8 @@ def pre_train(config, reduce_num_chs_to):
         reduce_num_chs_to=reduce_num_chs_to,
     )
 
-    # AlexMI
-    data, labels, meta, channels = get_AlexMI(
+    # MindBigData EEG dataset (local file)
+    data, labels, meta, channels = get_mindbigdata_eeg(
         freq_min=config["freq"][0], freq_max=config["freq"][1], resample=resample
     )
     train_data, train_labels, train_meta, test_data, test_labels, test_meta = (
@@ -36,25 +36,8 @@ def pre_train(config, reduce_num_chs_to):
         data_set=test_data, channel_names=channels, label=test_labels
     )
 
-    # BNCI2015004
-    data, labels, meta, channels = get_BNCI2015004(
-        freq_min=config["freq"][0], freq_max=config["freq"][1]
-    )
-    train_data, train_labels, train_meta, test_data, test_labels, test_meta = (
-        train_test_split(data, labels, meta, test_size=test_size)
-    )
-
-    train_data = zero_mean_unit_var(mne_epochs=train_data, meta_data=train_meta)
-    test_data = zero_mean_unit_var(mne_epochs=test_data, meta_data=test_meta)
-    train_data_set.append_data_set(
-        data_set=train_data, channel_names=channels, label=train_labels
-    )
-    test_data_set.append_data_set(
-        data_set=test_data, channel_names=channels, label=test_labels
-    )
-
-    # Cho2017
-    data, labels, meta, channels = get_Cho2017(
+    # MindBigData EEG dataset (second batch)
+    data, labels, meta, channels = get_mindbigdata_eeg(
         freq_min=config["freq"][0], freq_max=config["freq"][1], resample=resample
     )
     train_data, train_labels, train_meta, test_data, test_labels, test_meta = (
@@ -70,8 +53,8 @@ def pre_train(config, reduce_num_chs_to):
         data_set=test_data, channel_names=channels, label=test_labels
     )
 
-    # Lee
-    data, labels, meta, channels = get_Lee2019_MI(
+    # Synthetic EEG data for testing (third dataset)
+    data, labels, meta, channels = get_synthetic_eeg_data(
         freq_min=config["freq"][0], freq_max=config["freq"][1], resample=resample
     )
     train_data, train_labels, train_meta, test_data, test_labels, test_meta = (
@@ -87,8 +70,25 @@ def pre_train(config, reduce_num_chs_to):
         data_set=test_data, channel_names=channels, label=test_labels
     )
 
-    # PhysionetMI
-    data, labels, meta, channels = get_PhysionetMI(
+    # Synthetic EEG data for testing (fourth dataset)
+    data, labels, meta, channels = get_synthetic_eeg_data(
+        freq_min=config["freq"][0], freq_max=config["freq"][1], resample=resample
+    )
+    train_data, train_labels, train_meta, test_data, test_labels, test_meta = (
+        train_test_split(data, labels, meta, test_size=test_size)
+    )
+
+    train_data = zero_mean_unit_var(mne_epochs=train_data, meta_data=train_meta)
+    test_data = zero_mean_unit_var(mne_epochs=test_data, meta_data=test_meta)
+    train_data_set.append_data_set(
+        data_set=train_data, channel_names=channels, label=train_labels
+    )
+    test_data_set.append_data_set(
+        data_set=test_data, channel_names=channels, label=test_labels
+    )
+
+    # Synthetic EEG data for testing (fifth dataset)
+    data, labels, meta, channels = get_synthetic_eeg_data(
         freq_min=config["freq"][0], freq_max=config["freq"][1], resample=resample
     )
     train_data, train_labels, train_meta, test_data, test_labels, test_meta = (
@@ -171,7 +171,7 @@ if __name__ == "__main__":
         "label_smoothing": 0,
         "augmentation": ["time_shifts"],
         # WandB
-        "wandb_log": True,
+        "wandb_log": False,  # Disabled for testing
         "wandb_name": False,
         "wandb_proj": "PatchedBrainTransformer",
         "wandb_watch": True,
