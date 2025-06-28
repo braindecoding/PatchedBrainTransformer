@@ -126,7 +126,7 @@ if __name__ == "__main__":
         "wandb_name": False,
         "wandb_proj": "PatchedBrainTransformer",
         "wandb_watch": True,
-        "save": False,  # add path as string where to save
+        "save": "models/mnist_brain_transformer",  # Path untuk menyimpan model
         "checkpoints": 20,
         "load": False,
         "seed": 42,  # set random seed
