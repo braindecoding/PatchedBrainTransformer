@@ -119,9 +119,8 @@ if __name__ == "__main__":
         # higher for pre-train may improve few-shot adaptation
         "dropout": 0.1,
         "label_smoothing": 0.1,
-        #"augmentation": ["time_shifts"],
-        # Tambahkan augmentasi yang sesuai untuk visual stimulus
-        "augmentation": ["time_shifts", "gaussian_noise"],
+        # Augmentasi yang didukung: time_shifts, DC_shifts, amplitude_scaling, noise
+        "augmentation": ["time_shifts", "noise"],
         # WandB
         "wandb_log": False,  # Disabled for testing
         "wandb_name": False,
