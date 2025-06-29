@@ -66,7 +66,7 @@ def get_mindbigdata_eeg(
         # Fields separated by TAB, data separated by comma
         # Example: 67650	67636	EP	F7	7	260	4482.564102,4477.435897,4484.102564...
         trials_processed = 0
-        max_trials = 10000  # Increased from 1000 to use more data (still manageable)
+        max_trials = 5000  # Reduced from 10000 due to memory constraints
 
         # Group data by event_id to reconstruct multi-channel trials
         events_data = {}
