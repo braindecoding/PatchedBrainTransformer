@@ -5,6 +5,7 @@ Debug dataset loading issues
 
 import sys
 import os
+import numpy as np
 sys.path.append('src')
 
 from utils import get_mindbigdata_eeg
