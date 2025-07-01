@@ -5,7 +5,7 @@ from src.train import training
 
 
 def pre_train(config, reduce_num_chs_to):
-    test_size = 0.05
+    test_size = 0.2  # Increased from 0.05 to 0.2 for better validation
     resample = 250
     train_data_set = SeqDataset(
         dim_token=config["d_input"],
@@ -129,13 +129,13 @@ if __name__ == "__main__":
         #"freq": [8, 45],
         "freq": [0.5, 40],  # atau [0.5, 40] tergantung karakteristik data visual
         "normalization": "zscore",
-        # Model
+        # Model (Reduced complexity to prevent overfitting)
         "d_input": 32,
         "d_model": 64,  # Input gets expanded in lin. projection
-        "dim_feedforward": 64 * 4,
+        "dim_feedforward": 64 * 2,  # Reduced from 64*4 to 64*2
         "num_tokens_per_channel": 7,  # For 256 samples EPOC (7*32=224 < 256)
-        "num_transformer_blocks": 4,
-        "num_heads": 8,  # number attention heads transformer
+        "num_transformer_blocks": 2,  # Reduced from 4 to 2
+        "num_heads": 4,  # Reduced from 8 to 4
         "bert_supervised": False,  # add a reconstruction task (BERT) as regularisation to loss
         "learnable_cls": False,
         "bias_transformer": True,
@@ -146,15 +146,15 @@ if __name__ == "__main__":
         "num_epochs": 200,
         "betas": (0.9, 0.95),  # betas AdamW
         "clip_gradient": 1.0,
-        # Regularization & Augmentation
-        "weight_decay": 0.01,  # not applied to LayerNorm, self_att and biases
-        "weight_decay_pos_embedding": 0.0,  # weight decay applied to learnable pos. embedding
+        # Regularization & Augmentation (Enhanced for overfitting prevention)
+        "weight_decay": 0.05,  # Increased from 0.01 to 0.05
+        "weight_decay_pos_embedding": 0.01,  # Increased from 0.0 to 0.01
         "weight_decay_cls_head": 1,  # cls_head = classification head (linear layer)
         # higher for pre-train may improve few-shot adaptation
-        "dropout": 0.1,
-        "label_smoothing": 0.1,
+        "dropout": 0.2,  # Increased from 0.1 to 0.2
+        "label_smoothing": 0.15,  # Increased from 0.1 to 0.15
         # Augmentasi yang didukung: time_shifts, DC_shifts, amplitude_scaling, noise
-        "augmentation": ["time_shifts", "noise"],
+        "augmentation": ["time_shifts", "noise", "amplitude_scaling"],  # Added amplitude_scaling
         # WandB
         "wandb_log": False,  # Disabled for testing
         "wandb_name": False,
@@ -167,6 +167,10 @@ if __name__ == "__main__":
         "compile_model": False,  # compile model with PyTroch to speed up
         "plot_training": True,  # Enable real-time plotting of training curves
         "mixed_precision": True,  # Enable Automatic Mixed Precision (AMP) for faster training
+        # Early stopping to prevent overfitting
+        "early_stopping": True,
+        "early_stopping_patience": 20,  # Stop if no improvement for 20 epochs
+        "early_stopping_min_delta": 0.001,  # Minimum change to qualify as improvement
     }
 
     # Opsi 1: Single run dengan seed 42 (untuk reproduksibilitas penuh)

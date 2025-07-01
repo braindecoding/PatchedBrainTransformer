@@ -192,6 +192,13 @@ def training(
     train_acc_list = []
     test_acc_list = []
 
+    # Early stopping variables
+    best_test_loss = float('inf')
+    patience_counter = 0
+    early_stopping_patience = parameter.get("early_stopping_patience", 20)
+    early_stopping_min_delta = parameter.get("early_stopping_min_delta", 0.001)
+    early_stopping_enabled = parameter.get("early_stopping", False)
+
     # Initialize AMP scaler if mixed precision is enabled and available
     use_amp = (parameter.get("mixed_precision", False) and
                device.type == 'cuda' and
@@ -433,6 +440,21 @@ def training(
         else:
             train_acc_list.append(0)  # No accuracy for BERT pre-training
             test_acc_list.append(0)
+
+        # Early stopping check
+        if early_stopping_enabled:
+            if current_test_loss < best_test_loss - early_stopping_min_delta:
+                best_test_loss = current_test_loss
+                patience_counter = 0
+                print(f"   ✅ New best test loss: {best_test_loss:.4f}")
+            else:
+                patience_counter += 1
+                print(f"   ⏳ No improvement for {patience_counter}/{early_stopping_patience} epochs")
+
+                if patience_counter >= early_stopping_patience:
+                    print(f"\n🛑 Early stopping triggered after {ml_epochs + 1} epochs")
+                    print(f"   Best test loss: {best_test_loss:.4f}")
+                    break
 
         # GPU Memory monitoring (every 50 epochs)
         if device.type == 'cuda' and (ml_epochs + 1) % 50 == 0:
