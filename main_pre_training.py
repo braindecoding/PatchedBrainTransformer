@@ -169,7 +169,7 @@ if __name__ == "__main__":
         "mixed_precision": True,  # Enable Automatic Mixed Precision (AMP) for faster training
         # Early stopping to prevent overfitting
         "early_stopping": True,
-        "early_stopping_patience": 20,  # Stop if no improvement for 20 epochs
+        "early_stopping_patience": 100,  # Stop if no improvement for 100 epochs (increased for larger dataset)
         "early_stopping_min_delta": 0.001,  # Minimum change to qualify as improvement
     }
 
