@@ -1157,16 +1157,25 @@ def train_test_split(data, labels, meta, test_size=0.05):
         random_state=42  # Untuk reproduksibilitas
     )
 
+    # Validasi tidak ada overlap antara train dan test indices
+    assert len(set(train_idx).intersection(set(test_idx))) == 0, "Data leakage: overlapping indices in train/test split!"
+    assert len(train_idx) + len(test_idx) == data.shape[0], "Sample count mismatch after split!"
+
     train_data = data[train_idx]
     train_labels = labels[train_idx]
     train_meta = meta.iloc[train_idx].reset_index(drop=True)
+    # Simpan original indices untuk validasi
+    train_meta['original_idx'] = train_idx
 
     test_data = data[test_idx]
     test_labels = labels[test_idx]
     test_meta = meta.iloc[test_idx].reset_index(drop=True)
+    # Simpan original indices untuk validasi
+    test_meta['original_idx'] = test_idx
 
     # Print distribusi untuk verifikasi
     print(f"Train label distribution: {np.bincount(train_labels)}")
     print(f"Test label distribution: {np.bincount(test_labels)}")
+    print(f"Split validation: {len(train_idx)} train + {len(test_idx)} test = {len(train_idx) + len(test_idx)} total samples")
 
     return train_data, train_labels, train_meta, test_data, test_labels, test_meta
