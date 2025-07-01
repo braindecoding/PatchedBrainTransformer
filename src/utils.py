@@ -1144,15 +1144,29 @@ def zero_mean_unit_var(mne_epochs, meta_data):
 # ----------------------------------------------------------------------------------------------------------------------
 # train test split
 def train_test_split(data, labels, meta, test_size=0.05):
-    idx = np.arange(data.shape[0])
-    np.random.shuffle(idx)
+    """
+    Stratified train-test split untuk memastikan distribusi label seimbang
+    """
+    from sklearn.model_selection import train_test_split as sklearn_split
 
-    train_data = data[idx[: int(idx.shape[0] * (1 - test_size))]]
-    train_labels = labels[idx[: int(idx.shape[0] * (1 - test_size))]]
-    train_meta = meta.iloc[idx[: int(idx.shape[0] * (1 - test_size))]]
+    # Gunakan stratified split untuk mempertahankan distribusi label
+    train_idx, test_idx = sklearn_split(
+        np.arange(data.shape[0]),
+        test_size=test_size,
+        stratify=labels,
+        random_state=42  # Untuk reproduksibilitas
+    )
 
-    test_data = data[idx[int(idx.shape[0] * (1 - test_size)) :]]
-    test_labels = labels[idx[int(idx.shape[0] * (1 - test_size)) :]]
-    test_meta = meta.iloc[idx[int(idx.shape[0] * (1 - test_size)) :]]
+    train_data = data[train_idx]
+    train_labels = labels[train_idx]
+    train_meta = meta.iloc[train_idx].reset_index(drop=True)
+
+    test_data = data[test_idx]
+    test_labels = labels[test_idx]
+    test_meta = meta.iloc[test_idx].reset_index(drop=True)
+
+    # Print distribusi untuk verifikasi
+    print(f"Train label distribution: {np.bincount(train_labels)}")
+    print(f"Test label distribution: {np.bincount(test_labels)}")
 
     return train_data, train_labels, train_meta, test_data, test_labels, test_meta

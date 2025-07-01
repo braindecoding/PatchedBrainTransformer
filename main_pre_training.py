@@ -27,6 +27,14 @@ def pre_train(config, reduce_num_chs_to):
         train_test_split(data, labels, meta, test_size=test_size)
     )
 
+    # Validasi tidak ada overlap antara train dan test
+    train_indices = set(train_meta.index)
+    test_indices = set(test_meta.index)
+    assert len(train_indices.intersection(test_indices)) == 0, "Data leakage detected: overlapping indices!"
+
+    print(f"Data split validation passed - no overlap between train ({len(train_indices)}) and test ({len(test_indices)}) sets")
+
+    # Normalisasi dilakukan TERPISAH untuk train dan test (mencegah data leakage)
     train_data = zero_mean_unit_var(mne_epochs=train_data, meta_data=train_meta)
     test_data = zero_mean_unit_var(mne_epochs=test_data, meta_data=test_meta)
     train_data_set.append_data_set(
