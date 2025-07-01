@@ -4,8 +4,52 @@ import os
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
+import numpy as np
 
 from src.model import LearningRateScheduler
+
+
+def plot_training_progress(epochs, train_losses, test_losses, train_accs, test_accs, save_path="plots/"):
+    """Plot training progress in real-time"""
+    os.makedirs(save_path, exist_ok=True)
+
+    plt.figure(figsize=(15, 5))
+
+    # Loss plot
+    plt.subplot(1, 3, 1)
+    plt.plot(epochs, train_losses, 'b-', label='Train Loss', linewidth=2)
+    plt.plot(epochs, test_losses, 'r-', label='Test Loss', linewidth=2)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training & Test Loss')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    # Accuracy plot
+    plt.subplot(1, 3, 2)
+    plt.plot(epochs, train_accs, 'b-', label='Train Accuracy', linewidth=2)
+    plt.plot(epochs, test_accs, 'r-', label='Test Accuracy', linewidth=2)
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy (%)')
+    plt.title('Training & Test Accuracy')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    # Overfitting indicator
+    plt.subplot(1, 3, 3)
+    if len(train_losses) > 0 and len(test_losses) > 0:
+        loss_diff = np.array(test_losses) - np.array(train_losses)
+        plt.plot(epochs, loss_diff, 'g-', linewidth=2)
+        plt.axhline(y=0, color='k', linestyle='--', alpha=0.5)
+        plt.xlabel('Epoch')
+        plt.ylabel('Test Loss - Train Loss')
+        plt.title('Overfitting Indicator')
+        plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(f'{save_path}/training_progress.png', dpi=150, bbox_inches='tight')
+    plt.close()  # Close to prevent memory issues
 
 
 def training(
@@ -107,6 +151,13 @@ def training(
         collate_fn=test_data_set.my_collate,
         num_workers=num_workers,
     )
+
+    # Initialize lists for plotting
+    epoch_list = []
+    train_loss_list = []
+    test_loss_list = []
+    train_acc_list = []
+    test_acc_list = []
 
     for ml_epochs in range(parameter["num_epochs"]):
         lr = learning_rate_scheduler.get_lr(iteration=ml_epochs)
@@ -289,6 +340,26 @@ def training(
                             ml_epochs, current_acc_train, current_acc_test
                         )
                     )
+
+        # Store metrics for plotting
+        epoch_list.append(ml_epochs)
+        train_loss_list.append(current_train_loss)
+        test_loss_list.append(current_test_loss)
+
+        if not parameter["pre_train_bert"]:
+            train_acc_list.append(current_acc_train.cpu().numpy() if torch.is_tensor(current_acc_train) else current_acc_train)
+            test_acc_list.append(current_acc_test.cpu().numpy() if torch.is_tensor(current_acc_test) else current_acc_test)
+        else:
+            train_acc_list.append(0)  # No accuracy for BERT pre-training
+            test_acc_list.append(0)
+
+        # Plot every 10 epochs or at the end (if plotting is enabled)
+        if parameter.get("plot_training", False) and ((ml_epochs + 1) % 10 == 0 or ml_epochs == parameter["num_epochs"] - 1):
+            if parameter["save"]:
+                plot_path = parameter["save"] if not parameter["wandb_log"] else os.path.join(parameter["save"], wandb.run.name if parameter["wandb_log"] else "")
+                plot_training_progress(epoch_list, train_loss_list, test_loss_list, train_acc_list, test_acc_list, plot_path)
+            else:
+                plot_training_progress(epoch_list, train_loss_list, test_loss_list, train_acc_list, test_acc_list)
 
         if parameter["checkpoints"]:
             if parameter["save"]:

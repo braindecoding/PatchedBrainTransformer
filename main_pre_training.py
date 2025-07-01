@@ -140,6 +140,7 @@ if __name__ == "__main__":
         "load": False,
         "seed": 42,  # set random seed
         "compile_model": False,  # compile model with PyTroch to speed up
+        "plot_training": True,  # Enable real-time plotting of training curves
     }
 
     # Opsi 1: Single run dengan seed 42 (untuk reproduksibilitas penuh)
