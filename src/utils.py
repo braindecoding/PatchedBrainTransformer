@@ -66,13 +66,13 @@ def get_mindbigdata_eeg(
         # Fields separated by TAB, data separated by comma
         # Example: 67650	67636	EP	F7	7	260	4482.564102,4477.435897,4484.102564...
         trials_processed = 0
-        max_trials = 20000  # Increased for better training (was 5000)
+        max_trials = None  # Use ALL available data (unlimited)
 
         # Group data by event_id to reconstruct multi-channel trials
         events_data = {}
 
         for line_idx, line in enumerate(lines):
-            if trials_processed >= max_trials:
+            if max_trials is not None and trials_processed >= max_trials:
                 break
 
             line = line.strip()

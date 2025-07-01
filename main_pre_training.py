@@ -139,11 +139,11 @@ if __name__ == "__main__":
         "bert_supervised": False,  # add a reconstruction task (BERT) as regularisation to loss
         "learnable_cls": False,
         "bias_transformer": True,
-        # Train Hyper-Parameters
-        "lr": 5e-5,
-        "lr_warm_up_iters": 50,
-        "batch_size": 32,
-        "num_epochs": 200,
+        # Train Hyper-Parameters (Optimized for larger dataset)
+        "lr": 1e-4,  # Increased from 5e-5 for larger dataset
+        "lr_warm_up_iters": 100,  # Increased from 50 for more gradual warmup
+        "batch_size": 64,  # Increased from 32 for larger dataset efficiency
+        "num_epochs": 300,  # Increased from 200 for larger dataset
         "betas": (0.9, 0.95),  # betas AdamW
         "clip_gradient": 1.0,
         # Regularization & Augmentation (Enhanced for overfitting prevention)
