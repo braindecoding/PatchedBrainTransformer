@@ -133,13 +133,25 @@ if __name__ == "__main__":
         "compile_model": False,  # compile model with PyTroch to speed up
     }
 
-    for i in range(1, 4):
-        config["seed"] = i
-        torch.manual_seed(config["seed"])
-        torch.cuda.manual_seed(config["seed"])
-        np.random.seed(config["seed"])
-        random.seed(config["seed"])
-        torch.backends.cudnn.deterministic = True
-        # torch.use_deterministic_algorithms(True)
+    # Opsi 1: Single run dengan seed 42 (untuk reproduksibilitas penuh)
+    torch.manual_seed(config["seed"])
+    torch.cuda.manual_seed(config["seed"])
+    np.random.seed(config["seed"])
+    random.seed(config["seed"])
+    torch.backends.cudnn.deterministic = True
+    # torch.use_deterministic_algorithms(True)
 
-        pre_train(config, reduce_num_chs_to=30)
+    pre_train(config, reduce_num_chs_to=30)
+
+    # Opsi 2: Multiple runs dengan seed deterministik (uncomment jika diperlukan)
+    # seeds = [42, 123, 456]  # seed yang tetap untuk reproduksibilitas
+    # for seed in seeds:
+    #     config["seed"] = seed
+    #     torch.manual_seed(config["seed"])
+    #     torch.cuda.manual_seed(config["seed"])
+    #     np.random.seed(config["seed"])
+    #     random.seed(config["seed"])
+    #     torch.backends.cudnn.deterministic = True
+    #
+    #     print(f"Running with seed: {seed}")
+    #     pre_train(config, reduce_num_chs_to=30)
