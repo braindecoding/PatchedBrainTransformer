@@ -20,9 +20,21 @@ def pre_train(config, reduce_num_chs_to):
     )
 
     # MindBigData EEG dataset (local file)
-    data, labels, meta, channels = get_mindbigdata_eeg(
+    print("📊 Loading MindBigData EEG dataset...")
+    result = get_mindbigdata_eeg(
         freq_min=config["freq"][0], freq_max=config["freq"][1], resample=resample
     )
+
+    if result is None:
+        print("❌ Failed to load MindBigData dataset!")
+        print("   Please check:")
+        print("   1. Dataset file exists: datasets/EP1.01.txt")
+        print("   2. File format is correct")
+        print("   3. File is not corrupted")
+        print("\n🛑 Training stopped - dataset required!")
+        exit(1)
+
+    data, labels, meta, channels = result
     train_data, train_labels, train_meta, test_data, test_labels, test_meta = (
         train_test_split(data, labels, meta, test_size=test_size)
     )

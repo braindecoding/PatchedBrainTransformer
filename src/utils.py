@@ -106,9 +106,9 @@ def get_mindbigdata_eeg(
                 # Extract size (actual number of samples in this signal)
                 try:
                     signal_size = int(float(parts[5]))
-                    if signal_size < 100:  # Skip if too few samples
+                    if signal_size is None or signal_size < 100:  # Skip if None or too few samples
                         continue
-                except:
+                except (ValueError, TypeError, IndexError):
                     continue  # Skip if can't parse size
 
                 # Extract EEG data (from column 6, comma-separated)
@@ -148,7 +148,7 @@ def get_mindbigdata_eeg(
         signal_sizes = []
         channels_per_event = []
         for event_data in events_data.values():
-            if 'signal_size' in event_data:
+            if 'signal_size' in event_data and event_data['signal_size'] is not None:
                 signal_sizes.append(event_data['signal_size'])
             channels_per_event.append(len(event_data['channels']))
 
@@ -159,7 +159,7 @@ def get_mindbigdata_eeg(
             print(f"Events with 14 channels: {sum(1 for x in channels_per_event if x == 14)}/{len(channels_per_event)}")
 
         for event_id, event_data in events_data.items():
-            if trials_processed >= max_trials:
+            if max_trials is not None and trials_processed >= max_trials:
                 break
 
             # Check if we have enough channels for this event
