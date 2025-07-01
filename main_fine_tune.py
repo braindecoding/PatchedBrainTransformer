@@ -186,7 +186,16 @@ if __name__ == "__main__":
         "data_set": "BNCI2014001",
     }
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Check CUDA availability - STOP if not available
+    if not torch.cuda.is_available():
+        print("❌ CUDA is not available!")
+        print("   Fine-tuning requires GPU for reasonable performance.")
+        print("   Please run 'python check_cuda.py' to verify CUDA setup")
+        print("\n🛑 Fine-tuning stopped - CUDA required!")
+        exit(1)
+
+    device = torch.device("cuda")
+    print(f"🚀 Fine-tuning on device: {device}")
 
     for i in range(1, 4):
         config["seed"] = i

@@ -49,7 +49,32 @@ def pre_train(config, reduce_num_chs_to):
     train_data_set.prepare_data_set()
     test_data_set.prepare_data_set(set_pos_channels=train_data_set.dict_channels)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Check CUDA availability - STOP if not available
+    if not torch.cuda.is_available():
+        print("❌ CUDA is not available!")
+        print("   This model requires GPU training for reasonable performance.")
+        print("   Please ensure:")
+        print("   1. NVIDIA GPU is installed and drivers are up to date")
+        print("   2. CUDA-enabled PyTorch is installed:")
+        print("      pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118")
+        print("   3. Run 'python check_cuda.py' to verify CUDA setup")
+        print("\n� Training stopped - CUDA required!")
+        exit(1)
+
+    device = torch.device("cuda")
+
+    # Print device information
+    print(f"🚀 Using device: {device}")
+    print(f"   GPU: {torch.cuda.get_device_name(0)}")
+    print(f"   Memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+    print(f"   CUDA Version: {torch.version.cuda}")
+    print(f"   cuDNN Version: {torch.backends.cudnn.version()}")
+
+    # Enable optimizations
+    torch.backends.cudnn.benchmark = True  # Optimize for consistent input sizes
+    torch.backends.cuda.matmul.allow_tf32 = True  # Allow TF32 for faster training
+    torch.backends.cudnn.allow_tf32 = True
+    print("   ✅ CUDA optimizations enabled")
 
     # Validasi konfigurasi
     assert config["d_model"] % config["num_heads"] == 0
@@ -141,6 +166,7 @@ if __name__ == "__main__":
         "seed": 42,  # set random seed
         "compile_model": False,  # compile model with PyTroch to speed up
         "plot_training": True,  # Enable real-time plotting of training curves
+        "mixed_precision": True,  # Enable Automatic Mixed Precision (AMP) for faster training
     }
 
     # Opsi 1: Single run dengan seed 42 (untuk reproduksibilitas penuh)

@@ -4,6 +4,7 @@ import os
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from torch.amp import autocast, GradScaler
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -62,8 +63,23 @@ def training(
     chose_optimizer="customAdamW",
 ):
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Ensure CUDA is available for training
+    if not torch.cuda.is_available():
+        print("❌ CUDA is not available for training!")
+        print("   Training requires GPU. Please check CUDA setup.")
+        raise RuntimeError("CUDA required for training - use 'python check_cuda.py' to verify setup")
+
+    device = torch.device("cuda")
     model.to(device)
+
+    # Print device and memory info
+    print(f"🚀 Training on device: {device}")
+    print(f"   GPU Memory before training: {torch.cuda.memory_allocated()/1024**3:.2f} GB allocated")
+    print(f"   GPU Memory reserved: {torch.cuda.memory_reserved()/1024**3:.2f} GB")
+
+    # Clear cache to start fresh
+    torch.cuda.empty_cache()
+    print("   ✅ GPU cache cleared")
 
     # log with WandB
     if parameter["wandb_log"]:
@@ -159,6 +175,15 @@ def training(
     train_acc_list = []
     test_acc_list = []
 
+    # Initialize AMP scaler if mixed precision is enabled
+    use_amp = parameter.get("mixed_precision", False) and device.type == 'cuda'
+    scaler = GradScaler('cuda') if use_amp else None
+
+    if use_amp:
+        print("⚡ Mixed Precision Training (AMP) enabled")
+    else:
+        print("🔧 Standard precision training")
+
     for ml_epochs in range(parameter["num_epochs"]):
         lr = learning_rate_scheduler.get_lr(iteration=ml_epochs)
         for param_group in optimizer.param_groups:
@@ -184,10 +209,12 @@ def training(
 
             # loop over mini batches with same number of tokens
             for sub_batch in range(len(data["patched_eeg_token"])):
-                transformer_out, logits1, pos_masking = model.forward(
-                    x=data["patched_eeg_token"][sub_batch].to(device),
-                    pos=data["pos_as_int"][sub_batch].type(torch.LongTensor).to(device),
-                )
+                # Use autocast for mixed precision
+                with autocast('cuda', enabled=use_amp):
+                    transformer_out, logits1, pos_masking = model.forward(
+                        x=data["patched_eeg_token"][sub_batch].to(device),
+                        pos=data["pos_as_int"][sub_batch].type(torch.LongTensor).to(device),
+                    )
 
                 if parameter["pre_train_bert"]:
                     if True in pos_masking:
@@ -197,7 +224,13 @@ def training(
                             )[pos_masking],
                             target=transformer_out[pos_masking],
                         ) * (data["labels"][sub_batch].size(0) / num_trials)
-                        loss.backward()
+
+                        # Backward pass with AMP
+                        if use_amp:
+                            scaler.scale(loss).backward()
+                        else:
+                            loss.backward()
+
                         logits = torch.cat((logits, logits1), dim=0)
                         target = torch.cat((target, data["labels"][sub_batch]), dim=0)
                         current_help_loss += loss
@@ -208,18 +241,34 @@ def training(
                         logits1,
                         data["labels"][sub_batch].type(torch.LongTensor).to(device),
                     ) * (data["labels"][sub_batch].size(0) / num_trials)
-                    loss.backward()
+
+                    # Backward pass with AMP
+                    if use_amp:
+                        scaler.scale(loss).backward()
+                    else:
+                        loss.backward()
+
                     logits = torch.cat((logits, logits1), dim=0)
                     target = torch.cat((target, data["labels"][sub_batch]), dim=0)
                     current_help_loss += loss
 
             current_train_loss += current_help_loss
 
-            if parameter["clip_gradient"]:
-                torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), max_norm=parameter["clip_gradient"]
-                )
-            optimizer.step()
+            # Gradient clipping and optimizer step with AMP
+            if use_amp:
+                if parameter["clip_gradient"]:
+                    scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(
+                        model.parameters(), max_norm=parameter["clip_gradient"]
+                    )
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                if parameter["clip_gradient"]:
+                    torch.nn.utils.clip_grad_norm_(
+                        model.parameters(), max_norm=parameter["clip_gradient"]
+                    )
+                optimizer.step()
 
             pred_labels_train = torch.cat((pred_labels_train, logits.argmax(dim=1)), 0)
             true_labels_train = torch.cat((true_labels_train, target.to(device)), 0)
@@ -352,6 +401,10 @@ def training(
         else:
             train_acc_list.append(0)  # No accuracy for BERT pre-training
             test_acc_list.append(0)
+
+        # GPU Memory monitoring (every 50 epochs)
+        if device.type == 'cuda' and (ml_epochs + 1) % 50 == 0:
+            print(f"   📊 Epoch {ml_epochs+1} - GPU Memory: {torch.cuda.memory_allocated()/1024**3:.2f} GB allocated, {torch.cuda.memory_reserved()/1024**3:.2f} GB reserved")
 
         # Plot every 10 epochs or at the end (if plotting is enabled)
         if parameter.get("plot_training", False) and ((ml_epochs + 1) % 10 == 0 or ml_epochs == parameter["num_epochs"] - 1):
