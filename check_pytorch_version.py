@@ -54,15 +54,17 @@ def check_pytorch_amp():
                 scaler = GradScaler()
                 autocast_ctx = autocast()
             
-            # Simple test
+            # Simple test with gradient requirement
             device = torch.device('cuda')
-            x = torch.randn(2, 3, device=device)
-            
+            x = torch.randn(2, 3, device=device, requires_grad=True)
+
             with autocast_ctx:
                 y = x * 2.0
-            
+
             loss = y.sum()
             scaler.scale(loss).backward()
+            scaler.step(torch.optim.SGD([x], lr=0.1))
+            scaler.update()
             
             print("✅ AMP functionality: WORKING")
             

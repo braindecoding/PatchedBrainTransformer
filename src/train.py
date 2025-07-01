@@ -4,16 +4,24 @@ import os
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-# Import AMP components with fallback for different PyTorch versions
+# Import AMP components with proper fallback for PyTorch versions
 try:
-    from torch.amp import autocast, GradScaler
+    # Try PyTorch 1.6+ style first (more common)
+    from torch.cuda.amp import autocast, GradScaler
+    AMP_AVAILABLE = True
+    print("🔧 Using torch.cuda.amp (PyTorch 1.6+ style)")
 except ImportError:
     try:
-        from torch.cuda.amp import autocast, GradScaler
+        # Try PyTorch 2.0+ style
+        from torch.amp import autocast, GradScaler
+        AMP_AVAILABLE = True
+        print("🔧 Using torch.amp (PyTorch 2.0+ style)")
     except ImportError:
-        # Fallback for older PyTorch versions
+        # No AMP available
         autocast = None
         GradScaler = None
+        AMP_AVAILABLE = False
+        print("⚠️ AMP not available - using standard precision")
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -187,15 +195,10 @@ def training(
     # Initialize AMP scaler if mixed precision is enabled and available
     use_amp = (parameter.get("mixed_precision", False) and
                device.type == 'cuda' and
-               GradScaler is not None and
-               autocast is not None)
+               AMP_AVAILABLE)
 
     if use_amp:
-        try:
-            scaler = GradScaler('cuda')
-        except TypeError:
-            # Fallback for older PyTorch versions
-            scaler = GradScaler()
+        scaler = GradScaler()  # torch.cuda.amp.GradScaler() doesn't need device parameter
     else:
         scaler = None
 
@@ -231,13 +234,9 @@ def training(
 
             # loop over mini batches with same number of tokens
             for sub_batch in range(len(data["patched_eeg_token"])):
-                # Use autocast for mixed precision with fallback
-                if use_amp and autocast is not None:
-                    try:
-                        autocast_context = autocast('cuda', enabled=True)
-                    except TypeError:
-                        # Fallback for older PyTorch versions
-                        autocast_context = autocast(enabled=True)
+                # Use autocast for mixed precision
+                if use_amp:
+                    autocast_context = autocast(enabled=True)
                 else:
                     # No-op context manager for non-AMP training
                     from contextlib import nullcontext
