@@ -4,7 +4,16 @@ import os
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-from torch.amp import autocast, GradScaler
+# Import AMP components with fallback for different PyTorch versions
+try:
+    from torch.amp import autocast, GradScaler
+except ImportError:
+    try:
+        from torch.cuda.amp import autocast, GradScaler
+    except ImportError:
+        # Fallback for older PyTorch versions
+        autocast = None
+        GradScaler = None
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -175,12 +184,25 @@ def training(
     train_acc_list = []
     test_acc_list = []
 
-    # Initialize AMP scaler if mixed precision is enabled
-    use_amp = parameter.get("mixed_precision", False) and device.type == 'cuda'
-    scaler = GradScaler('cuda') if use_amp else None
+    # Initialize AMP scaler if mixed precision is enabled and available
+    use_amp = (parameter.get("mixed_precision", False) and
+               device.type == 'cuda' and
+               GradScaler is not None and
+               autocast is not None)
+
+    if use_amp:
+        try:
+            scaler = GradScaler('cuda')
+        except TypeError:
+            # Fallback for older PyTorch versions
+            scaler = GradScaler()
+    else:
+        scaler = None
 
     if use_amp:
         print("⚡ Mixed Precision Training (AMP) enabled")
+    elif parameter.get("mixed_precision", False):
+        print("⚠️ Mixed Precision requested but not available (using standard precision)")
     else:
         print("🔧 Standard precision training")
 
@@ -209,8 +231,19 @@ def training(
 
             # loop over mini batches with same number of tokens
             for sub_batch in range(len(data["patched_eeg_token"])):
-                # Use autocast for mixed precision
-                with autocast('cuda', enabled=use_amp):
+                # Use autocast for mixed precision with fallback
+                if use_amp and autocast is not None:
+                    try:
+                        autocast_context = autocast('cuda', enabled=True)
+                    except TypeError:
+                        # Fallback for older PyTorch versions
+                        autocast_context = autocast(enabled=True)
+                else:
+                    # No-op context manager for non-AMP training
+                    from contextlib import nullcontext
+                    autocast_context = nullcontext()
+
+                with autocast_context:
                     transformer_out, logits1, pos_masking = model.forward(
                         x=data["patched_eeg_token"][sub_batch].to(device),
                         pos=data["pos_as_int"][sub_batch].type(torch.LongTensor).to(device),
